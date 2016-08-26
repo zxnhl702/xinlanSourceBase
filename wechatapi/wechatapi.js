@@ -1,6 +1,6 @@
 /**
  * 微信js-sdk相关的javascript
- *
+ * 请在html页面上引入http://res.wx.qq.com/open/js/jweixin-1.0.0.js
  * 1. 参数说明
  * 1.1 callAjaxURL
  * 		后台服务地址，用来计算验证用参数和拼接分享链接用参数
@@ -10,6 +10,8 @@
  * 		# getConfig2 用于url为http://XXXXX/XX.html
  * 		# getConfigWithWXName 用于url为http://XXXXX/XX.html?from=XXX&XX=XX
  * 			其中from参数是活动的微信公众号 传到后台的参数除了url外还需要取url上的参数from转到后台
+ *		# getConfigWithAuthKey 用于url为http://XXXXX/XX.html?state=XXX&XX=XX
+ *			其中state是微信auth2链接中的state参数
  * 		此处的url均指不带openid等微信代过来的参数情况下的原始url
  * 1.3 url
  * 		页面传到后台的地址，必须是当前页面完整的地址，否则微信验证通不过
@@ -33,66 +35,45 @@ $(function() {
 	// 微信登陆的情况下
 	if(weixinLogin) {
 		// ajax后台URL
-		var callAjaxURL = "";
+		var callAjaxURL = "http://develop.zsgd.com:11010/auth";
 		// 微信js-sdk参数计算的入口
-		var cmd = "getConfig";
+		var cmd = "getConfigWithWXName";
 		// 页面地址
 		var url = window.location.href.split("#")[0];
 		// 是否开启微信js-sdk自带的调试
 		var isDebugOn = false;
 		// 分享用链接
+		var wechatURL = "https://open.weixin.qq.com/connect/oauth2/authorize?appid=APPID&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=STATE#wechat_redirect";
 		var shareURL = "";
 		// 分享用图标
-		var shareImg = imgURL + "/vote_" + _getPar("vote_id") + "/banner.jpg";
+		var shareImg = 'http://develop.wifizs.cn:11001/91MQ/hifm91Logo.jpg';
 		// 分享用标题
 		var shareTitle = $("title").text();
 		// 分享用描述
-		var shareDesc = $("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。"
-		// 分享用链接模板
-		var wechatURL = "https://open.weixin.qq.com/connect/oauth2/authorize?appid=APPID&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=STATE#wechat_redirect";
-		// 加载js文件
-		$.getScript('http://res.wx.qq.com/open/js/jweixin-1.0.0.js', function() {
-			// 微信配置
-			var _wechatAjax = _genCallAjax(wxAjaxURL);
-			_wechatAjax({
-				"cmd": cmd,
-				"url": url,
-			}, function(d) {
-				if(d.success) {
-					// 如果分享用链接没有在js文件开头定义，则使用后台传来的参数与常量中的URL模版拼接生成链接
-					if ("" == shareURL) {
-						// 生成分享用链接
-						shareURL = wechatURL.replace("APPID", d.data.appid).replace("STATE", d.data.state);
-					}
-					// 通过config接口注入权限验证配置
-					wx.config({
-						debug: isDebugOn,
-						appId: d.data.appid,
-						timestamp: d.data.timestamp,
-						nonceStr: d.data.nonceStr,
-						signature: d.data.signature,
-						jsApiList:[
-							'checkJsApi',
-							'onMenuShareTimeline',
-							'onMenuShareAppMessage',
-							'onMenuShareQQ',
-							'onMenuShareWeibo',
-							'onMenuShareQZone',
-							'hideOptionMenu',
-							'showOptionMenu',
-							'hideMenuItems',
-							'showMenuItems'
-						]
-					})
-				}
-			});
+		var shareDesc = $("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。";
 
-			// config信息验证
-			// 验证通过时的事件，所有文档中可以调用的api写在这里
-			wx.ready(function() {
-				// 验证api
-				wx.checkJsApi({
+		// 微信配置
+		var _wechatAjax = _genCallAjax(callAjaxURL);
+		_wechatAjax({
+			"cmd": cmd,
+			"url": url,
+			"weixin": _getPar("wxname")
+		}, function(d) {
+			if(d.success) {
+				// 如果分享用链接没有在js文件开头定义，则使用后台传来的参数与常量中的URL模版拼接生成链接
+				if ("" == shareURL) {
+					// 生成分享用链接
+					shareURL = wechatURL.replace("APPID", d.data.appid).replace("STATE", d.data.state);
+				}
+				// 通过config接口注入权限验证配置
+				wx.config({
+					debug: isDebugOn,
+					appId: d.data.appid,
+					timestamp: d.data.timestamp,
+					nonceStr: d.data.nonceStr,
+					signature: d.data.signature,
 					jsApiList:[
+						'checkJsApi',
 						'onMenuShareTimeline',
 						'onMenuShareAppMessage',
 						'onMenuShareQQ',
@@ -102,151 +83,170 @@ $(function() {
 						'showOptionMenu',
 						'hideMenuItems',
 						'showMenuItems'
-					],
-					success: function(res) {
-						//alert("检测通过："  +JSON.stringify(res));
-					},
-					fail: function(res) {
-						//alert("检测失败："  +JSON.stringify(res));
-					},
-					complete: function(res) {
-						//alert("检测结束");
-					}
-				});
-
-				// 监听“分享给朋友”，按钮点击、自定义分享内容及分享结果接口
-				wx.onMenuShareAppMessage({
-					title: shareTitle,//$("title").text(),
-					desc: shareDesc,//$("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。",
-					link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
-					imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
-					trigger: function (res) {
-						//alert("点击分享：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					success: function (res) {
-						//alert("分享成功：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					cancel: function (res) {
-						//alert("取消分享：" +JSON.stringify(res));
-						// 用户取消分享后执行的回调函数
-					},
-					fail:function (res) {
-						//alert("分享失败：" +JSON.stringify(res));
-					}
-				});
-
-				// 监听“分享到朋友圈”按钮点击、自定义分享内容及分享结果接口
-				wx.onMenuShareTimeline({
-					title: shareTitle,//$("title").text(),
-					desc: shareDesc,//$("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。",
-					link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
-					imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
-					trigger: function (res) {
-						//alert("点击分享：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					success: function (res) {
-						//alert("分享成功：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					cancel: function (res) {
-						//alert("取消分享：" +JSON.stringify(res));
-						// 用户取消分享后执行的回调函数
-					},
-					fail:function (res) {
-						//alert("分享失败：" +JSON.stringify(res));
-					}
-				});
-
-				// 监听“分享到QQ”按钮点击、自定义分享内容及分享结果接口
-				wx.onMenuShareQQ({
-					title: shareTitle,//$("title").text(),
-					desc: shareDesc,//$("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。",
-					link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
-					imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
-					trigger: function (res) {
-						//alert("点击分享：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					success: function (res) {
-						//alert("分享成功：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					cancel: function (res) {
-						//alert("取消分享：" +JSON.stringify(res));
-						// 用户取消分享后执行的回调函数
-					},
-					fail:function (res) {
-						//alert("分享失败：" +JSON.stringify(res));
-					}
+					]
 				})
+			}
+		});
 
-				// 监听“分享到微博”按钮点击、自定义分享内容及分享结果接口
-				wx.onMenuShareWeibo({
-					title: shareTitle,//$("title").text(),
-					desc: shareDesc,//$("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。",
-					link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
-					imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
-					trigger: function (res) {
-						//alert("点击分享：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					success: function (res) {
-						//alert("分享成功：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					cancel: function (res) {
-						//alert("取消分享：" +JSON.stringify(res));
-						// 用户取消分享后执行的回调函数
-					},
-					fail:function (res) {
-						//alert("分享失败：" +JSON.stringify(res));
-					}
-				})
-
-				// 监听“分享到QQ空间”按钮点击、自定义分享内容及分享结果接口
-				wx.onMenuShareQZone({
-					title: shareTitle,//$("title").text(),
-					desc: shareDesc,//$("title").text() + " 活动等你来参加！本活动技术支持：新蓝广科。",
-					link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
-					imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
-					trigger: function (res) {
-						//alert("点击分享：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					success: function (res) {
-						//alert("分享成功：" +JSON.stringify(res));
-						// 用户确认分享后执行的回调函数
-					},
-					cancel: function (res) {
-						//alert("取消分享：" +JSON.stringify(res));
-						// 用户取消分享后执行的回调函数
-					},
-					fail:function (res) {
-						//alert("分享失败：" +JSON.stringify(res));
-					}
-				})
-
-				// 批量隐藏菜单项
-				wx.hideMenuItems({
-					menuList: [
-						"menuItem:copyUrl", // 复制链接
-						"menuItem:readMode", // 阅读模式
-						"menuItem:openWithQQBrowser", // 在QQ浏览器中打开
-						"menuItem:openWithSafari", // 在Safari中打开
-						"menuItem:share:email" // 邮件
-					],
-					success: function (res) {
-//						alert('已隐藏“阅读模式”，“分享到朋友圈”，“复制链接”等按钮');
-					},
-					fail: function (res) {
-//						alert(JSON.stringify(res));
-					}
-				})
-
+		// config信息验证
+		// 验证通过时的事件，所有文档中可以调用的api写在这里
+		wx.ready(function() {
+			// 验证api
+			wx.checkJsApi({
+				jsApiList:[
+					'onMenuShareTimeline',
+					'onMenuShareAppMessage',
+					'onMenuShareQQ',
+					'onMenuShareWeibo',
+					'onMenuShareQZone',
+					'hideOptionMenu',
+					'showOptionMenu',
+					'hideMenuItems',
+					'showMenuItems'
+				],
+				success: function(res) {
+					//alert("检测通过："  +JSON.stringify(res));
+				},
+				fail: function(res) {
+					//alert("检测失败："  +JSON.stringify(res));
+				},
+				complete: function(res) {
+					//alert("检测结束");
+				}
 			});
+
+			// 监听“分享给朋友”，按钮点击、自定义分享内容及分享结果接口
+			wx.onMenuShareAppMessage({
+				title: shareTitle,
+				desc: shareDesc,
+				link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
+				imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
+				trigger: function (res) {
+					//alert("点击分享：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				success: function (res) {
+					//alert("分享成功：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				cancel: function (res) {
+					//alert("取消分享：" +JSON.stringify(res));
+					// 用户取消分享后执行的回调函数
+				},
+				fail:function (res) {
+					//alert("分享失败：" +JSON.stringify(res));
+				}
+			});
+
+			// 监听“分享到朋友圈”按钮点击、自定义分享内容及分享结果接口
+			wx.onMenuShareTimeline({
+				title: shareTitle,
+				desc: shareDesc,
+				link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
+				imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
+				trigger: function (res) {
+					//alert("点击分享：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				success: function (res) {
+					//alert("分享成功：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				cancel: function (res) {
+					//alert("取消分享：" +JSON.stringify(res));
+					// 用户取消分享后执行的回调函数
+				},
+				fail:function (res) {
+					//alert("分享失败：" +JSON.stringify(res));
+				}
+			});
+
+			// 监听“分享到QQ”按钮点击、自定义分享内容及分享结果接口
+			wx.onMenuShareQQ({
+				title: shareTitle,
+				desc: shareDesc,
+				link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
+				imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
+				trigger: function (res) {
+					//alert("点击分享：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				success: function (res) {
+					//alert("分享成功：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				cancel: function (res) {
+					//alert("取消分享：" +JSON.stringify(res));
+					// 用户取消分享后执行的回调函数
+				},
+				fail:function (res) {
+					//alert("分享失败：" +JSON.stringify(res));
+				}
+			})
+
+			// 监听“分享到微博”按钮点击、自定义分享内容及分享结果接口
+			wx.onMenuShareWeibo({
+				title: shareTitle,
+				desc: shareDesc,
+				link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
+				imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
+				trigger: function (res) {
+					//alert("点击分享：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				success: function (res) {
+					//alert("分享成功：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				cancel: function (res) {
+					//alert("取消分享：" +JSON.stringify(res));
+					// 用户取消分享后执行的回调函数
+				},
+				fail:function (res) {
+					//alert("分享失败：" +JSON.stringify(res));
+				}
+			})
+
+			// 监听“分享到QQ空间”按钮点击、自定义分享内容及分享结果接口
+			wx.onMenuShareQZone({
+				title: shareTitle,
+				desc: shareDesc,
+				link: shareURL,//'https://open.weixin.qq.com/connect/oauth2/authorize?appid=wxee6284b0c702c21e&redirect_uri=http%3A%2F%2Fdevelop.zsgd.com%3A11010%2Fauth%3Fcmd%3Dauth%26callback%3Dnil%26token%3DJh2044695&response_type=code&scope=snsapi_userinfo&state=vote11#wechat_redirect',
+				imgUrl: shareImg,//'http://develop.zsgd.com:11001/images/xinlanUser/1.jpg',
+				trigger: function (res) {
+					//alert("点击分享：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				success: function (res) {
+					//alert("分享成功：" +JSON.stringify(res));
+					// 用户确认分享后执行的回调函数
+				},
+				cancel: function (res) {
+					//alert("取消分享：" +JSON.stringify(res));
+					// 用户取消分享后执行的回调函数
+				},
+				fail:function (res) {
+					//alert("分享失败：" +JSON.stringify(res));
+				}
+			})
+
+			// 批量隐藏菜单项
+			wx.hideMenuItems({
+				menuList: [
+					"menuItem:copyUrl", // 复制链接
+					"menuItem:readMode", // 阅读模式
+					"menuItem:openWithQQBrowser", // 在QQ浏览器中打开
+					"menuItem:openWithSafari", // 在Safari中打开
+					"menuItem:share:email" // 邮件
+				],
+				success: function (res) {
+//						alert('已隐藏“阅读模式”，“分享到朋友圈”，“复制链接”等按钮');
+				},
+				fail: function (res) {
+//						alert(JSON.stringify(res));
+				}
+			})
+
 		});
 	}
 })
